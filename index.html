@@ -239,12 +239,15 @@ const SUBHEAD={25:'Department Policy & Procedure',27:'Criminal Statutes',29:'Res
 const RATINGS=['1','2','3','4','5','6','7'];
 const PHASES=['Phase I','Phase II','Phase III','Remedial'];
 const PHASE_RIDES={'Phase I':24,'Phase II':16,'Phase III':16,'Remedial':8};
+const isLimbo=d=>!!(d&&d.ungraded);
+const rideGroup=p=>[p];
+const LIMBO_REASON='Not graded';
 const PH_LABEL={L:'Limbo',1:'Phase I',2:'Phase II',3:'Phase III'};
 const TIPS='SET THE STAGE · USE QUOTES · USE LISTS · INCLUDE REMEDIAL · FRONT = BACK · USE SEGs · REMEMBER YOUR AUDIENCE · DO NOT PREDICT';
 const CALLS=['MV stop','Crash','Alarm','Domestic','Welfare check','Suspicious','Theft','Disturbance','Arrest','Mental health','Foot patrol','Assist'];
 function rClass(r){if(!r||r==='NO')return'r-no';const n=+r;return n<=2?'r-lo':n===3?'r-mid':n<=5?'r-ok':'r-hi'}
 const isNum=r=>/^[1-7]$/.test(r);
-function normPhase(p){const m={'Phase 1':'Phase I','Phase 2':'Phase II','Phase 3':'Phase III','Phase 4':'Phase III','Shadow / Eval':'Phase III','Extended':'Remedial'};return PHASES.includes(p)?p:(m[p]||'Phase I')}
+function normPhase(p){const m={'Limbo':'Phase I','Phase 1':'Phase I','Phase 2':'Phase II','Phase 3':'Phase III','Phase 4':'Phase III','Shadow / Eval':'Phase III','Extended':'Remedial'};return PHASES.includes(p)?p:(m[p]||'Phase I')}
 
 // ================= state =================
 const LS='fto_fieldbook_v2', LS_OLD='fto_fieldbook_v1', LSD='fto_fieldbook_draft';
@@ -375,7 +378,7 @@ function initCaps(){
 const micBtn=target=>DICT?`<button class="mic${dictState==='listening'&&dictTarget===target?' on':''}" data-act="mic" data-t="${target}" aria-label="Dictate"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg></button>`:'';
 
 // ================= phase / ride logic =================
-function nextRide(tid,phase,date){return dorsFor(tid).filter(d=>d.phase===phase&&d.date<=date).length+1}
+function nextRide(tid,phase,date,exclude){const g=rideGroup(phase);return dorsFor(tid).filter(d=>g.includes(d.phase)&&d.date<=date&&d.id!==exclude).length+1}
 function rideLabel(phase,ride){const wk=Math.ceil(ride/4);const max=PHASE_RIDES[phase]||16;return `${phase} · Ride ${ride}/${max} · Wk ${wk}${phase==='Phase I'&&ride<=8?' (Limbo)':''}`}
 function rtpCompleted(tid,cat,date){return Object.values(S.rtps).filter(r=>r.tid===tid&&r.cat==cat&&r.completed===true&&(!date||r.date<=date)).length}
 function rtpCount(tid,cat){return Object.values(S.rtps).filter(r=>r.tid===tid&&r.cat==cat).length}
@@ -397,7 +400,7 @@ function recentCats(){
 function header(){
   const t=T();
   $('#hdrName').textContent=t?t.name:'FTO FieldBook';
-  if(t){const ds=dorsFor(t.id).filter(d=>d.phase===t.phase);$('#hdrSub').textContent=`Level ${t.level} · ${t.phase} · ${ds.length} ride${ds.length===1?'':'s'} logged`}
+  if(t){const g=rideGroup(t.phase);const ds=dorsFor(t.id).filter(d=>g.includes(d.phase));$('#hdrSub').textContent=`Level ${t.level} · ${t.phase} · ${ds.length} ride${ds.length===1?'':'s'} logged`}
   else $('#hdrSub').textContent=(P().agency||'')+' FTEP';
   const map={dor:'dors',rtp:'dors'};
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===(map[view]||view)));
@@ -482,14 +485,14 @@ function vDors(){
 }
 
 // ---------------- DOR build ----------------
-const prevDor=(tid,date)=>dorsFor(tid).filter(d=>d.date<date).pop();
+const prevDor=(tid,date)=>dorsFor(tid).filter(d=>d.date<date&&!isLimbo(d)).pop();
 function noteLine(n){return `${n.call?n.call+(n.caseNo?' #'+n.caseNo:'')+' – ':n.caseNo?'#'+n.caseNo+' – ':''}${n.text}${n.rem?` [remedial ${n.rem} min]`:''}`.trim()}
 function buildDor(date){
   const t=T();
   const exist=dorsFor(t.id).find(d=>d.date===date);if(exist)return exist;
   const prev=prevDor(t.id,date);
   const d=normDor({id:uid(),tid:t.id,date,status:'draft',phase:t.phase,ride:nextRide(t.id,t.phase,date),shiftHours:t.shift||'',totalHours:'',fto:P().fto.name,created:Date.now()});
-  segsFor(t).forEach(s=>{d.ratings[s.n]=(P().settings.carry&&prev&&isNum(prev.ratings[s.n]))?prev.ratings[s.n]:'NO'});
+  segsFor(t).forEach(s=>{d.ratings[s.n]=(!isLimbo(d)&&P().settings.carry&&prev&&isNum(prev.ratings[s.n]))?prev.ratings[s.n]:'NO'});
   pullNotes(d);
   S.dors[d.id]=d;saveDor(d);
   return d;
@@ -500,15 +503,15 @@ function pullNotes(d){
   ns.forEach(n=>{
     d.used.push(n.id);
     if(n.cat){const k=n.cat;d.comments[k]=(d.comments[k]?d.comments[k]+'\n':'')+noteLine(n);
-      if(!isNum(d.ratings[k]))d.ratings[k]=n.tone==='-'?'3':'4';
+      if(!isLimbo(d)&&!isNum(d.ratings[k]))d.ratings[k]=n.tone==='-'?'3':'4';
       if(n.rem){d.rem[k]=true;d.time[k]=String((+d.time[k]||0)+(+n.rem||0))}
       if(n.tone==='+')(pos[k]=pos[k]||[]).push(n);if(n.tone==='-')(neg[k]=neg[k]||[]).push(n)}
     else d.narrative=(d.narrative?d.narrative+'\n':'')+noteLine(n);
   });
   const top=o=>Object.entries(o).sort((a,b)=>b[1].length-a[1].length)[0];
   const p=top(pos),q=top(neg);
-  if(p&&!d.most.cat)d.most={cat:+p[0],text:p[1].map(noteLine).join(' ')};
-  if(q&&!d.least.cat)d.least={cat:+q[0],text:q[1].map(noteLine).join(' ')};
+  if(!isLimbo(d)&&p&&!d.most.cat)d.most={cat:+p[0],text:p[1].map(noteLine).join(' ')};
+  if(!isLimbo(d)&&q&&!d.least.cat)d.least={cat:+q[0],text:q[1].map(noteLine).join(' ')};
   // shift data from tagged calls
   const day=notesFor(d.tid).filter(n=>n.date===d.date);
   const callKeys=new Set(day.filter(n=>n.call||n.caseNo).map(n=>n.caseNo||n.call+'@'+n.time));
@@ -521,6 +524,7 @@ function pullNotes(d){
 }
 function validate(d){
   const err=[],warn=[];const t=TR(d.tid);
+  if(isLimbo(d)){const any=(d.narrative||'').trim()||Object.values(d.comments).some(c=>(c||'').trim());if(!any)err.push('An ungraded DOR still needs a narrative');segsFor(t).forEach(s=>{if(d.rem[s.n]&&!(d.comments[s.n]||'').trim())err.push(`#${s.n} ${s.name}: REM needs narrative`);if(d.rem[s.n]&&!d.time[s.n])warn.push(`#${s.n}: REM checked — add TIME (minutes)`)});if(!d.totalHours)warn.push('Total hours worked is blank');return {err,warn}}
   segsFor(t).forEach(s=>{const n=s.n,r=d.ratings[n],c=(d.comments[n]||'').trim();
     const need=['1','2','6','7'].includes(r)||d.rem[n]||d.nrt[n];
     if(need&&!c)err.push(`#${n} ${s.name}: ${d.nrt[n]?'NRT':d.rem[n]?'REM':'rated '+r} needs narrative`);
@@ -532,10 +536,34 @@ function validate(d){
   if(f&&(!d.least.cat||!(d.least.text||'').trim()))err.push('A failing grade was given: least acceptable area + incident is mandatory');
   if(!f&&(d.least.cat||(d.least.text||'').trim()))warn.push('All ratings are passing: least acceptable should be left blank');
   if(!d.totalHours)warn.push('Total hours worked is blank');
+  if((d.nonFto||'').trim())warn.push('A non-FTO is listed: per the FTEP manual a non-FTO ride gets no evaluation — tick Not graded');
   return {err,warn};
 }
 
 // ---------------- DOR editor ----------------
+function gradedCards(d,segs,prev,f,dis,catOpts){return `  <div class="card" style="padding:4px 12px 8px">
+  ${GROUPS.map(g=>{const ss=segs.filter(s=>s.g===g);if(!ss.length)return'';return `<div class="grp">${g}</div>`+ss.map(s=>{
+    const n=s.n,r=d.ratings[n]||'NO',cm=d.comments[n]||'',pr=prev&&prev.ratings[n];
+    const miss=(['1','2','6','7'].includes(r)||d.rem[n]||d.nrt[n])&&!cm.trim();
+    return `${SUBHEAD[n]?`<div class="small muted" style="margin:8px 2px 0;font-weight:600">${SUBHEAD[n]}</div>`:''}<button class="cat" data-act="rate" data-n="${n}"><span class="num">${n}</span><span class="nm"><b>${esc(s.name)}${miss?'<span class="flag red">narrative</span>':''}${d.rem[n]?`<span class="mini">REM${d.time[n]?' '+esc(d.time[n])+'m':''}</span>`:''}${d.nrt[n]?'<span class="mini n">NRT</span>':''}${d.aiCats&&d.aiCats.includes(n)?'<span class="flag blue">✦</span>':''}</b><span>${cm?esc(cm.split('\n')[0]):(pr?`<span class="prev">prev ${esc(pr)}</span>`:'')}</span></span><span class="pill ${rClass(r)}">${esc(r)}</span></button>`}).join('')}).join('')}
+  </div>
+  <div class="card">
+    <h3>Most acceptable area <span class="flag">mandatory</span></h3>
+    <select data-dor="most.cat" ${dis}>${catOpts(d.most.cat)}</select>
+    <textarea data-dor="most.text" style="margin-top:8px" placeholder="A specific incident that demonstrates today's performance in this area" ${dis}>${esc(d.most.text)}</textarea>
+  </div>
+  <div class="card">
+    <h3>Least acceptable area ${f?'<span class="flag red">mandatory – failing grade</span>':'<span class="mini">leave blank – all passing</span>'}</h3>
+    <select data-dor="least.cat" ${dis}>${catOpts(d.least.cat)}</select>
+    <textarea data-dor="least.text" style="margin-top:8px" placeholder="${f?'A specific incident that demonstrates the failing performance':'Only needed on shifts with a failing grade'}" ${dis}>${esc(d.least.text)}</textarea>
+  </div>`}
+function limboCard(d,segs,locked){return `<div class="card">
+    <h3>Not graded</h3>
+    <p class="small muted" style="margin:-4px 0 8px">This DOR is narrative only: the rating boxes on the form stay blank. Write the narrative below, and add a SEG narrative wherever you want a category # on the form.</p>
+    ${segs.filter(s=>(d.comments[s.n]||'').trim()||d.rem[s.n]).map(s=>`<button class="cat" data-act="rate" data-n="${s.n}"><span class="num">${s.n}</span><span class="nm"><b>${esc(s.name)}${d.rem[s.n]?`<span class="mini">REM${d.time[s.n]?' '+esc(d.time[s.n])+'m':''}</span>`:''}${d.aiCats&&d.aiCats.includes(s.n)?'<span class="flag blue">✦</span>':''}</b><span>${esc((d.comments[s.n]||'').split('\n')[0])}</span></span></button>`).join('')}
+    ${locked?'':`<button class="btn full" style="margin-top:8px" data-act="limboSeg">＋ Narrative for a SEG</button>`}
+  </div>`}
+
 function vDor(){
   const d=S.dors[curDor];if(!d){view='dors';return vDors()}
   const t=TR(d.tid);const locked=d.status==='final';const dis=locked?'disabled':'';
@@ -552,34 +580,20 @@ function vDor(){
     <div class="row"><div class="grow"><label class="f">Shift hours</label><input type="text" data-dor="shiftHours" value="${esc(d.shiftHours)}" placeholder="0600–1600" ${dis}></div><div style="width:34%"><label class="f">Total hrs worked</label><input type="text" inputmode="decimal" data-dor="totalHours" value="${esc(d.totalHours)}" ${dis}></div></div>
     <div class="row"><div class="grow"><label class="f">FTO</label><input type="text" data-dor="fto" value="${esc(d.fto)}" ${dis}></div><div class="grow"><label class="f">Non-FTO (if any)</label><input type="text" data-dor="nonFto" value="${esc(d.nonFto)}" ${dis}></div></div>
     <label class="f">Assignment or reason for no evaluation</label><input type="text" data-dor="assignment" value="${esc(d.assignment)}" placeholder="e.g. Day patrol, Car 12" ${dis}>
-    <label class="switch" style="border:0;padding-bottom:0"><span class="small">Attachments</span><input type="checkbox" data-dorchk="attach" ${d.attach?'checked':''} ${dis}></label>
+    <label class="switch"><span class="small">Attachments</span><input type="checkbox" data-dorchk="attach" ${d.attach?'checked':''} ${dis}></label>
+    <label class="switch" style="border:0;padding-bottom:0"><span class="small"><b>Not graded</b><br><span class="muted">Narrative only: no ratings, NRT or most/least. For a ride with a non-FTO or any shift that isn't evaluated.</span></span><input type="checkbox" data-dorchk="ungraded" ${d.ungraded?'checked':''} ${dis}></label>
   </div>
   ${!locked&&(newNotes||SAMPLE)?`<div class="card" style="border-color:var(--ailine)">
     ${newNotes?`<div class="row" style="margin-bottom:${SAMPLE?10:0}px"><span class="grow small">${newNotes} new note${newNotes>1?'s':''} for this date since the DOR was built.</span><button class="btn sm" data-act="repull">Pull in</button></div>`:''}
-    ${SAMPLE?`<button class="btn ai full" data-act="aiDraft" id="aiBtn">✦ Draft ratings & narrative with Claude</button><div class="small muted" style="margin-top:6px">Reads this shift's notes against your SEGs and suggests ratings and documentation. It never sets NRT. Ratings and narratives you set yourself are kept on a redraft: Claude writes around them. Every ✦ is a suggestion until you check it.</div><div id="aiStatus"></div>`:''}
+    ${SAMPLE?`<button class="btn ai full" data-act="aiDraft" id="aiBtn">✦ Draft ${isLimbo(d)?'narrative':'ratings & narrative'} with Claude</button><div class="small muted" style="margin-top:6px">${isLimbo(d)?'Reads this shift&#39;s notes and writes a short narrative, with SEG numbers where they fit. Nothing is graded. Anything you typed yourself is kept.':`Reads this shift's notes against your SEGs and suggests ratings and documentation. It never sets NRT. Ratings and narratives you set yourself are kept on a redraft: Claude writes around them. Every ✦ is a suggestion until you check it.`}</div><div id="aiStatus"></div>`:''}
   </div>`:''}
   ${!locked&&v.err.length?`<div class="warnbox"><b>Required before final</b><ul style="margin:4px 0 0;padding-left:18px">${v.err.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
   ${!locked&&v.warn.length?`<div class="hint"><b>Check</b><ul style="margin:4px 0 0;padding-left:18px">${v.warn.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
-  ${d.ai&&!locked?`<div class="hint">✦ Claude suggested the ratings marked ✦. Confirm each one against what you saw.</div>`:''}
-  <div class="card" style="padding:4px 12px 8px">
-  ${GROUPS.map(g=>{const ss=segs.filter(s=>s.g===g);if(!ss.length)return'';return `<div class="grp">${g}</div>`+ss.map(s=>{
-    const n=s.n,r=d.ratings[n]||'NO',cm=d.comments[n]||'',pr=prev&&prev.ratings[n];
-    const miss=(['1','2','6','7'].includes(r)||d.rem[n]||d.nrt[n])&&!cm.trim();
-    return `${SUBHEAD[n]?`<div class="small muted" style="margin:8px 2px 0;font-weight:600">${SUBHEAD[n]}</div>`:''}<button class="cat" data-act="rate" data-n="${n}"><span class="num">${n}</span><span class="nm"><b>${esc(s.name)}${miss?'<span class="flag red">narrative</span>':''}${d.rem[n]?`<span class="mini">REM${d.time[n]?' '+esc(d.time[n])+'m':''}</span>`:''}${d.nrt[n]?'<span class="mini n">NRT</span>':''}${d.aiCats&&d.aiCats.includes(n)?'<span class="flag blue">✦</span>':''}</b><span>${cm?esc(cm.split('\n')[0]):(pr?`<span class="prev">prev ${esc(pr)}</span>`:'')}</span></span><span class="pill ${rClass(r)}">${esc(r)}</span></button>`}).join('')}).join('')}
-  </div>
-  <div class="card">
-    <h3>Most acceptable area <span class="flag">mandatory</span></h3>
-    <select data-dor="most.cat" ${dis}>${catOpts(d.most.cat)}</select>
-    <textarea data-dor="most.text" style="margin-top:8px" placeholder="A specific incident that demonstrates today's performance in this area" ${dis}>${esc(d.most.text)}</textarea>
-  </div>
-  <div class="card">
-    <h3>Least acceptable area ${f?'<span class="flag red">mandatory – failing grade</span>':'<span class="mini">leave blank – all passing</span>'}</h3>
-    <select data-dor="least.cat" ${dis}>${catOpts(d.least.cat)}</select>
-    <textarea data-dor="least.text" style="margin-top:8px" placeholder="${f?'A specific incident that demonstrates the failing performance':'Only needed on shifts with a failing grade'}" ${dis}>${esc(d.least.text)}</textarea>
-  </div>
+  ${d.ai&&!locked?`<div class="hint">✦ Claude drafted the items marked ✦. Confirm each one against what you saw.</div>`:''}
+  ${isLimbo(d)?limboCard(d,segs,locked):gradedCards(d,segs,prev,f,dis,catOpts)}
   <div class="card">
     <h3>Additional narrative / comments</h3>
-    <p class="small muted" style="margin:-4px 0 8px">Per-SEG narratives come from each rating. Use this for general notes; it goes in the form's narrative table without a category #.</p>
+    <p class="small muted" style="margin:-4px 0 8px">${isLimbo(d)?'The main write-up for this ungraded shift. Each line goes in the form&#39;s narrative table.':'Per-SEG narratives come from each rating. Use this for general notes; it goes in the form&#39;s narrative table without a category #.'}</p>
     <div class="row" style="align-items:flex-start"><textarea id="dNarr" class="grow" data-dor="narrative" style="min-height:110px" ${dis}>${esc(d.narrative)}</textarea>${locked?'':micBtn('dNarr')}</div>
     <div class="partial" id="partial"></div>
     <div class="tip">${TIPS}</div>
@@ -781,18 +795,18 @@ function rateSheet(n,instant){
   const prev=prevDor(d.tid,d.date);const pr=prev&&prev.ratings[n];
   const dayNotes=notesFor(d.tid).filter(x=>x.date===d.date&&x.cat===n);
   const rtpDone=rtpCompleted(d.tid,n,d.date),rtpAll=rtpCount(d.tid,n);
-  let r=d.ratings[n]||'NO';
+  let r=d.ratings[n]||'NO';const LB=isLimbo(d);
   const os=s.list?`<details><summary>Officer-safety violations observed (tap to add)</summary><div class="oslist">${s.list.map((x,i)=>`<label><input type="checkbox" data-os="${i}" ${dis}><span>${String.fromCharCode(97+i)}. ${esc(x)}</span></label>`).join('')}</div></details>`:'';
   const test=s.test?`<div class="row" style="margin:6px 0"><input type="number" inputmode="decimal" id="tScore" placeholder="Test score %" style="max-width:46%" ${dis}><span class="small muted grow">&lt;70% unacceptable · 70–90% acceptable · &gt;90% superior</span></div>`:'';
   openSheet(`
     <div class="row"><span class="mono" id="rateN" data-n="${n}" style="color:var(--acc)">${s.n}</span><h2 class="grow">${esc(s.name)}</h2>${pr?`<span class="prev">prev ${esc(pr)}</span>`:''}</div>
     <p class="small muted" style="margin:2px 0 4px">${esc(s.d)}</p>
-    <div class="rgrid">${RATINGS.map(x=>`<button data-r="${x}" class="${rClass(x)} ${r===x?'on':''}" ${dis}>${x}</button>`).join('')}</div>
-    <div class="rgrid2" style="grid-template-columns:1fr"><button data-r="NO" class="${r==='NO'?'on':''}" ${dis}>NO · Not observed</button></div>
+    ${LB?'<div class="hint">Not graded: narrative and REM only.</div>':`<div class="rgrid">${RATINGS.map(x=>`<button data-r="${x}" class="${rClass(x)} ${r===x?'on':''}" ${dis}>${x}</button>`).join('')}</div>
+    <div class="rgrid2" style="grid-template-columns:1fr"><button data-r="NO" class="${r==='NO'?'on':''}" ${dis}>NO · Not observed</button></div>`}
     <div class="tog ${d.rem[n]?'on':''}" id="remBox"><label class="row grow" style="gap:10px"><input type="checkbox" id="remChk" ${d.rem[n]?'checked':''} ${dis}><span class="small"><b>REM</b> · remedial training given</span></label><input type="number" inputmode="numeric" id="remTime" placeholder="TIME min" value="${esc(d.time[n]||'')}" style="width:96px" ${dis}></div>
-    <div class="tog ${d.nrt[n]?'on':''}"><label class="row grow" style="gap:10px"><input type="checkbox" id="nrtChk" ${d.nrt[n]?'checked':''} ${dis}><span class="small"><b>NRT</b> · not responding to training<br><span class="muted">${rtpDone} of 3 completed RTPs in this SEG${rtpAll>rtpDone?` (${rtpAll-rtpDone} open)`:''}</span></span></label></div>
+    ${LB?'':`<div class="tog ${d.nrt[n]?'on':''}"><label class="row grow" style="gap:10px"><input type="checkbox" id="nrtChk" ${d.nrt[n]?'checked':''} ${dis}><span class="small"><b>NRT</b> · not responding to training<br><span class="muted">${rtpDone} of 3 completed RTPs in this SEG${rtpAll>rtpDone?` (${rtpAll-rtpDone} open)`:''}</span></span></label></div>`}
     ${locked?'':`<button class="btn sm full" style="margin-top:8px" id="mkRtp">＋ Remedial Training Worksheet for #${n}</button>`}
-    ${test}
+    ${LB?'':test}
     <details><summary>SEG anchors (1 · 4 · 7)</summary>${anchors(s)}</details>
     ${os}
     <label class="f">Narrative <span id="cReq" class="flag red" style="display:none">required</span></label>
@@ -806,7 +820,7 @@ function rateSheet(n,instant){
   $('#rCom').oninput=e=>{d.comments[n]=e.target.value;manualOf(d).comments[n]=!!e.target.value.trim();req();save()};
   const rc=$('#remChk');if(rc){rc.onchange=()=>{d.rem[n]=rc.checked;if(!rc.checked)d.time[n]='';$('#remBox').classList.toggle('on',rc.checked);req();save()};
     $('#remTime').oninput=e=>{d.time[n]=e.target.value;if(e.target.value&&!d.rem[n]){d.rem[n]=true;rc.checked=true;$('#remBox').classList.add('on')}req();save()};
-    $('#nrtChk').onchange=e=>{d.nrt[n]=e.target.checked;e.target.closest('.tog').classList.toggle('on',e.target.checked);if(e.target.checked&&rtpDone<3)toast(`Heads up: NRT needs 3 completed RTPs in #${n} — ${rtpDone} logged`,3500);req();save()}}
+    const nc=$('#nrtChk');if(nc)nc.onchange=e=>{d.nrt[n]=e.target.checked;e.target.closest('.tog').classList.toggle('on',e.target.checked);if(e.target.checked&&rtpDone<3)toast(`Heads up: NRT needs 3 completed RTPs in #${n} — ${rtpDone} logged`,3500);req();save()}}
   const mk=$('#mkRtp');if(mk)mk.onclick=()=>{d.comments[n]=$('#rCom').value;saveDor(d);const rr=newRtp(n,d);sheetClose=null;closeSheet();curRtp=rr.id;view='rtp';setTimeout(()=>{render();window.scrollTo(0,0)},210)};
   sh.querySelectorAll('[data-os]').forEach(c=>c.onchange=()=>{if(!c.checked)return;const ta=$('#rCom');ta.value=(ta.value?ta.value+'\n':'')+'Unsafe practice ('+String.fromCharCode(97+ +c.dataset.os)+'): '+s.list[+c.dataset.os]+'.';ta.dispatchEvent(new Event('input'))});
   const ts=$('#tScore');if(ts)ts.onchange=()=>{const v=+ts.value;if(!ts.value)return;const sug=v<50?'1':v<60?'2':v<70?'3':v<80?'4':v<86?'5':v<=90?'6':'7';sh.querySelector(`[data-r="${sug}"]`)?.click();const ta=$('#rCom');ta.value=(ta.value?ta.value+'\n':'')+`Scored ${v}% on ${s.name.replace(': Testing','')} testing.`;ta.dispatchEvent(new Event('input'))};
@@ -854,7 +868,7 @@ function traineeSheet(id){
 // ================= export =================
 function narrativeRows(d){
   const t=TR(d.tid);const rows=[];
-  segsFor(t).forEach(s=>{const c=(d.comments[s.n]||'').trim();const r=d.ratings[s.n];if(c&&(isNum(r)||d.rem[s.n]||d.nrt[s.n])){let txt=c.replace(/\s*\n+\s*/g,' ');if(d.rem[s.n]&&d.time[s.n]&&!/remedial/i.test(c))txt+=` Remedial training: ${d.time[s.n]} min.`;rows.push({cat:String(s.n),text:txt})}});
+  segsFor(t).forEach(s=>{const c=(d.comments[s.n]||'').trim();const r=d.ratings[s.n];if(c&&(isLimbo(d)||isNum(r)||d.rem[s.n]||d.nrt[s.n])){let txt=c.replace(/\s*\n+\s*/g,' ');if(d.rem[s.n]&&d.time[s.n]&&!/remedial/i.test(c))txt+=` Remedial training: ${d.time[s.n]} min.`;rows.push({cat:String(s.n),text:txt})}});
   (d.narrative||'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(x=>rows.push({cat:'',text:x}));
   return rows;
 }
@@ -864,10 +878,10 @@ function dorFieldValues(d){
   v[7]=!!d.attach;v[8]=!d.attach;v[9]=d.assignment||'';
   for(let n=1;n<=40;n++){const b=10+(n-1)*12;for(let c=0;c<12;c++)v[b+c]='';
     if(t.level==='III'&&SEGMAP[n].l2)continue;
-    const r=d.ratings[n];if(isNum(r))v[b+(+r-1)]='X';else v[b+7]='X';
-    if((d.comments[n]||'').trim()&&(isNum(r)||d.rem[n]||d.nrt[n]))v[b+8]='X';
+    const r=d.ratings[n];const LB=isLimbo(d);if(!LB){if(isNum(r))v[b+(+r-1)]='X';else v[b+7]='X'}
+    if((d.comments[n]||'').trim()&&(LB||isNum(r)||d.rem[n]||d.nrt[n]))v[b+8]='X';
     if(d.nrt[n])v[b+9]='X';if(d.rem[n])v[b+10]='X';if(d.time[n])v[b+11]=String(d.time[n]);}
-  v[490]=d.most.cat?String(d.most.cat):'';v[491]=d.most.text||'';v[492]=d.least.cat?String(d.least.cat):'';v[493]=d.least.text||'';
+  if(isLimbo(d)){v[490]='';v[491]='';v[492]='';v[493]='';if(!d.assignment)v[9]=LIMBO_REASON}else{v[490]=d.most.cat?String(d.most.cat):'';v[491]=d.most.text||'';v[492]=d.least.cat?String(d.least.cat):'';v[493]=d.least.text||''}
   const rows=narrativeRows(d);const over=rows.length>15;
   v[494]=over;v[495]=!over;
   for(let i=0;i<15;i++){const r=rows[i];v[496+i*2]=r?r.cat:'';v[497+i*2]=r?r.text:''}
@@ -915,7 +929,7 @@ function dorText(d){
   if(d.assignment)L.push(`Assignment: ${d.assignment}`);
   L.push(line);L.push('#  CATEGORY                       RATE REM TIME NRT');
   GROUPS.forEach(g=>{const ss=segsFor(t).filter(s=>s.g===g);if(!ss.length)return;L.push(g.toUpperCase());
-    ss.forEach(s=>{const n=s.n,r=d.ratings[n]||'NO';L.push(`${String(n).padStart(2)} ${s.name.padEnd(30,'.').slice(0,30)} ${r.padStart(2)}  ${d.rem[n]?'X':' '}  ${String(d.time[n]||'').padStart(3)}  ${d.nrt[n]?'X':''}`)})});
+    ss.forEach(s=>{const n=s.n,r=isLimbo(d)?'—':(d.ratings[n]||'NO');L.push(`${String(n).padStart(2)} ${s.name.padEnd(30,'.').slice(0,30)} ${r.padStart(2)}  ${d.rem[n]?'X':' '}  ${String(d.time[n]||'').padStart(3)}  ${d.nrt[n]?'X':''}`)})});
   L.push(line);
   L.push(`MOST ACCEPTABLE: ${d.most.cat?'#'+d.most.cat+' '+SEGMAP[d.most.cat].name:'—'}`);if(d.most.text)L.push(d.most.text);L.push('');
   L.push(`LEAST ACCEPTABLE: ${d.least.cat?'#'+d.least.cat+' '+SEGMAP[d.least.cat].name:'— (all ratings passing)'}`);if(d.least.text)L.push(d.least.text);L.push('');
@@ -930,8 +944,8 @@ function exportSheet(d){
   const txt=dorText(d);const base=fileBase(d);const v=validate(d);
   openSheet(`<h2>Export DOR # ${esc(d.ride)}</h2>
   ${v.err.length?`<div class="warnbox" style="margin-top:8px">${v.err.length} required item${v.err.length>1?'s':''} still open. You can export a draft, but fix them before signing.</div>`:''}
-  ${DL?`<button class="btn pri full" style="margin-top:10px" id="xDocx">📄 FTEP-1 Word form (.docx)</button><p class="small muted" style="margin:6px 0 10px">Your department's own DOR form with every box filled in: ratings, NAR/NRT/REM/TIME columns, narrative table and shift data. If the narrative runs past 15 rows, the rest goes on an added page and "Additional Narrative Attached" is ticked.</p>
-  <div class="row"><button class="btn grow" id="xPdf">PDF</button><button class="btn grow" id="xCopy">Copy text</button></div>`:`<p class="small muted">File downloads aren't available in this view — copy the text instead.</p><button class="btn pri full" id="xCopy">Copy text</button>`}
+  ${DL?`<button class="btn pri full" style="margin-top:10px" id="xDocx">📄 FTEP-1 Word form (.docx)</button><p class="small muted" style="margin:6px 0 10px">Your actual FTEP-1 DOR – Level II and Level III fillable form, with every box filled in: ratings, NAR/NRT/REM/TIME columns, narrative table and shift data. If the narrative runs past 15 rows, the rest goes on an added page and "Additional Narrative Attached" is ticked.</p>
+  <div class="row"><button class="btn grow" id="xPdf">Quick PDF (not the official form)</button><button class="btn grow" id="xCopy">Copy text</button></div><p class="small muted" style="margin:6px 0 0">Need the official form as a PDF? Open the .docx in Word or Files on your phone and use Share → Print → Save as PDF.</p>`:`<p class="small muted">File downloads aren't available in this view — copy the text instead.</p><button class="btn pri full" id="xCopy">Copy text</button>`}
   <details style="margin-top:10px"><summary>Preview text</summary><div class="preview" style="margin:8px 0">${esc(txt)}</div></details>
   <button class="btn full" style="margin-top:8px" data-act="closeSheet">Close</button>`);
   $('#xCopy').onclick=()=>copyText(txt);
@@ -956,7 +970,7 @@ async function makePdf(d,base){
     GROUPS.forEach(g=>{body.push([{content:g.toUpperCase(),colSpan:14,styles:{halign:'center',fontStyle:'bold',fillColor:[225,225,225]}}]);
       SEGS.filter(s=>s.g===g).forEach(s=>{const n=s.n,r=d.ratings[n];const skip=t.level==='III'&&s.l2;const cells=new Array(12).fill('');
         if(SUBHEAD[n])body.push([{content:SUBHEAD[n].toUpperCase(),colSpan:14,styles:{halign:'center',fontStyle:'bolditalic',fontSize:6.8}}]);
-        if(!skip){if(isNum(r))cells[+r-1]='X';else cells[7]='X';if((d.comments[n]||'').trim()&&(isNum(r)||d.rem[n]||d.nrt[n]))cells[8]='X';if(d.nrt[n])cells[9]='X';if(d.rem[n])cells[10]='X';if(d.time[n])cells[11]=String(d.time[n])}
+        if(!skip){if(!isLimbo(d)){if(isNum(r))cells[+r-1]='X';else cells[7]='X'}if((d.comments[n]||'').trim()&&(isNum(r)||d.rem[n]||d.nrt[n]))cells[8]='X';if(d.nrt[n])cells[9]='X';if(d.rem[n])cells[10]='X';if(d.time[n])cells[11]=String(d.time[n])}
         body.push([n,s.name.toUpperCase(),...cells])})});
     const cw={0:{cellWidth:20},1:{halign:'left',cellWidth:208}};for(let i=2;i<9;i++)cw[i]={cellWidth:22};for(let i=9;i<14;i++)cw[i]={cellWidth:29};
     doc.autoTable({startY:doc.lastAutoTable.finalY+4,head:[['#','CATEGORY','1','2','3','4','5','6','7','NO','NAR','NRT','REM','TIME']],body,theme:'grid',margin:M,
@@ -991,11 +1005,39 @@ const segBrief=t=>segsFor(t).map(s=>`#${s.n} ${s.name}: ${s.d} | 1=${s.a1} | 4=$
 const PROGRAM=t=>`the ${P().agency||'police department'} Field Training & Evaluation Program (Vermont Criminal Justice Council, Level ${t.level} officer)`;
 const VOICE=`Write in the FIRST PERSON as the FTO ("I observed", "I instructed", "I corrected"). Refer to the trainee only as "Trainee" or "the trainee": never by name.`;
 function manualOf(d){d.manual=d.manual||{ratings:{},comments:{}};d.manual.ratings=d.manual.ratings||{};d.manual.comments=d.manual.comments||{};return d.manual}
+async function aiDraftLimbo(d,t,ns,btn,man){
+  const fixedC={};for(const k in man.comments)if(man.comments[k]&&(d.comments[k]||'').trim())fixedC[k]=d.comments[k];
+  const keepNarr=man.narrative&&(d.narrative||'').trim();
+  const prompt=`You help a Field Training Officer write a Daily Observation Report (FTEP-1 DOR) for ${PROGRAM(t)}. This shift is NOT GRADED (for example a ride with a non-FTO officer, or an orientation shift): nothing is evaluated. Do not give ratings, scores, NRT, or most/least acceptable areas, and do not judge performance against the standard.
+${VOICE}
+STYLE: concise, factual, past tense. One or two short sentences per item; no filler. Never write about the notes or the documentation themselves. Never state clock times or imply a time sequence unless a note's own text gives it. Cite call type/case # when given. Never invent facts.
+SEG categories (use only to label an item with the best-fitting category #): ${segsFor(t).map(s=>`#${s.n} ${s.name}`).join('; ')}
+${d.phase}, DOR #${d.ride}.
+${Object.keys(fixedC).length?`SEG narratives the FTO has written (final, do not return them): ${JSON.stringify(Object.keys(fixedC))}`:''}${keepNarr?' The FTO has written the general narrative: return "narrative" as an empty string.':''}
+FTO field notes for the ${d.date} shift, in no guaranteed order (tone: + did well, - needs work, 0 observed; "rem" = remedial training minutes):
+${ns.map(n=>`- tone ${n.tone} | SEG ${n.cat||'untagged'} | ${n.call||''} ${n.caseNo?'#'+n.caseNo:''} | rem ${n.rem||0} | ${n.text}`).join('\n')}
+Task: turn the notes into the shift narrative. Put each observation that clearly belongs to a SEG under that SEG # (what I showed, discussed or had the trainee do, and how the trainee did). Put orientation activity and anything without a clear SEG in "narrative", one item per line. Report remedial minutes only where a note records remedial training.
+Return ONLY JSON: {"comments":{"<seg#>":"..."},"rem":{"<seg#>":<minutes>},"narrative":"..."}`;
+  try{
+    const out=await SAMPLE.json(prompt,{modelTier:'complex'});
+    const valid=new Set(segsFor(t).map(s=>String(s.n)));d.aiCats=[];
+    segsFor(t).forEach(s=>{const k=String(s.n);if(!fixedC[k])d.comments[k]=''});
+    for(const [k,v] of Object.entries(out.comments||{}))if(valid.has(String(k))&&v&&!fixedC[k]){d.comments[k]=String(v);d.aiCats.push(+k)}
+    for(const [k,v] of Object.entries(out.rem||{}))if(valid.has(String(k))&&+v>0&&!d.time[k]){d.rem[k]=true;d.time[k]=String(Math.round(+v))}
+    if(!keepNarr)d.narrative=String(out.narrative||'').trim();
+    d.ai=true;ns.forEach(n=>{if(!d.used.includes(n.id))d.used.push(n.id)});
+    saveDor(d);render();toast('Claude drafted the narrative — check each ✦',3500);
+  }catch(e){
+    if(e&&e.code==='not_granted'){SAMPLE=null;render();return}
+    $('#aiStatus').innerHTML=`<div class="small" style="color:var(--neg);margin-top:8px">${e&&e.code==='rate_limited'?'Busy — try again in a minute.':'Couldn’t draft this time. Your DOR is unchanged.'}</div>`;btn.disabled=false;
+  }
+}
 async function aiDraft(){
   const d=S.dors[curDor];const t=TR(d.tid);const man=manualOf(d);
   const ns=notesFor(d.tid).filter(n=>n.date===d.date).reverse();
   if(!ns.length){toast('No notes on this date to draft from');return}
   const btn=$('#aiBtn');btn.disabled=true;$('#aiStatus').innerHTML='<div class="aiwork" style="margin-top:8px"><span class="spin"></span>Reading notes against the SEGs…</div>';
+  if(isLimbo(d))return aiDraftLimbo(d,t,ns,btn,man);
   const prev=prevDor(d.tid,d.date);
   const fixedR={};for(const k in man.ratings)if(man.ratings[k]&&d.ratings[k])fixedR[k]=d.ratings[k];
   const fixedC={};for(const k in man.comments)if(man.comments[k]&&(d.comments[k]||'').trim())fixedC[k]=d.comments[k];
@@ -1059,7 +1101,7 @@ Write two plain-text sections. ${VOICE} "deficiency": define the problem specifi
 }
 async function aiSummary(kind){
   const t=T();let ds=dorsFor(t.id);
-  if(kind==='week'){const W=weeksFor(t.id);ds=W[weekSel]||[]}else ds=ds.filter(d=>d.phase===t.phase);
+  if(kind==='week'){const W=weeksFor(t.id);ds=W[weekSel]||[]}else{const g=rideGroup(t.phase);ds=ds.filter(d=>g.includes(d.phase))}
   const out=$('#sumOut');out.innerHTML='<div class="card"><div class="aiwork"><span class="spin"></span>Reviewing '+ds.length+' DORs…</div></div>';out.scrollIntoView({behavior:'smooth',block:'nearest'});
   const compact=ds.map(d=>({date:d.date,ride:d.ride,ratings:d.ratings,rem:d.rem,time:d.time,nrt:d.nrt,most:d.most,least:d.least,narr:d.comments}));
   const rt=rtpsFor(t.id).map(r=>({cat:r.cat,date:r.date,assignment:r.assignment,completed:r.completed,competent:r.competent}));
@@ -1104,6 +1146,7 @@ const ACT={
   openDorDate:a=>{const d=dorsFor(T().id).find(x=>x.date===a.dataset.d);if(d)openDor(d.id)},
   openDor:a=>openDor(a.dataset.id),
   rate:a=>rateSheet(+a.dataset.n),
+  limboSeg:()=>catPicker(n=>setTimeout(()=>rateSheet(n),220)),
   rateNav:a=>{const d=S.dors[curDor];const list=segsFor(TR(d.tid)).map(s=>s.n);const cur=+$('#rateN').dataset.n;const i=list.indexOf(cur)+(+a.dataset.dir);if(i<0||i>=list.length)return;sheetClose=null;rateSheet(list[i],true)},
   repull:()=>{const d=S.dors[curDor];const n=pullNotes(d);saveDor(d);render();toast(`Pulled in ${n} note${n===1?'':'s'}`)},
   aiDraft:()=>aiDraft(), aiRtp:()=>aiRtp(), aiSummary:a=>aiSummary(a.dataset.kind),
@@ -1147,8 +1190,8 @@ document.addEventListener('input',e=>{
 document.addEventListener('change',e=>{
   const el=e.target;
   if(el.dataset.set){P().settings[el.dataset.set]=el.checked;saveProfile();return}
-  if(el.dataset.dorchk){const d=S.dors[curDor];d[el.dataset.dorchk]=el.checked;saveDor(d);return}
-  if(el.dataset.dor&&el.tagName==='SELECT'){const d=S.dors[curDor];if(el.dataset.dor==='phase'){d.ride=dorsFor(d.tid).filter(x=>x.phase===d.phase&&x.date<d.date&&x.id!==d.id).length+1;saveDor(d)}render();return}
+  if(el.dataset.dorchk){const d=S.dors[curDor];const k=el.dataset.dorchk;d[k]=el.checked;if(k==='ungraded'){if(el.checked&&!d.assignment)d.assignment=d.nonFto?`Not graded – ride with non-FTO ${d.nonFto}`:LIMBO_REASON;if(!el.checked&&/^Not graded/.test(d.assignment||''))d.assignment=''}saveDor(d);if(k==='ungraded')render();return}
+  if(el.dataset.dor&&el.tagName==='SELECT'){const d=S.dors[curDor];if(el.dataset.dor==='phase'){d.ride=nextRide(d.tid,d.phase,d.date,d.id);saveDor(d)}render();return}
   if(el.dataset.rtp==='cat'){render();return}
   if(el.id==='weekSel'){weekSel=el.value;render();return}
   if(el.id==='importFile'&&el.files[0]){const rd=new FileReader();rd.onload=()=>{try{const j=JSON.parse(rd.result);if(!j.notes||!j.profile)throw 0;
