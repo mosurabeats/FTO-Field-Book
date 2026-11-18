@@ -273,7 +273,7 @@ const P=()=>S.profile;
 const T=()=>P()&&P().trainees.find(t=>t.id===P().active);
 const TR=id=>P().trainees.find(t=>t.id===id)||{};
 const segsFor=t=>SEGS.filter(s=>!(s.l2&&t&&t.level==='III'));
-const notesFor=tid=>Object.values(S.notes).filter(n=>n.tid===tid).sort((a,b)=>(b.date+(b.time||'')).localeCompare(a.date+(a.time||''))||b.ts-a.ts);
+const notesFor=tid=>Object.values(S.notes).filter(n=>n.tid===tid).sort((a,b)=>b.date.localeCompare(a.date)||(b.ts||0)-(a.ts||0));
 const dorsFor=tid=>Object.values(S.dors).filter(d=>d.tid===tid).sort((a,b)=>a.date.localeCompare(b.date)||(a.created||0)-(b.created||0));
 const rtpsFor=tid=>Object.values(S.rtps).filter(r=>r.tid===tid).sort((a,b)=>b.date.localeCompare(a.date));
 function checksFor(tid){if(!S.checks[tid])S.checks[tid]={tid,items:{}};return S.checks[tid]}
@@ -444,7 +444,7 @@ function vNotes(){
     <details style="margin-top:8px" ${draft.call||draft.caseNo?'open':''}><summary>Call, case #, date & time</summary>
       <div class="chips" style="margin:6px 0 8px">${CALLS.map(x=>`<button class="chip ${draft.call===x?'on':''}" data-act="callChip" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>
       <div class="row"><input type="text" placeholder="Call type" data-bind="call" value="${esc(draft.call)}"><input type="text" placeholder="Case / incident #" data-bind="caseNo" value="${esc(draft.caseNo)}" style="max-width:42%"></div>
-      <div class="row" style="margin-top:8px"><input type="date" data-bind="date" value="${esc(draft.date)}"><input type="text" class="mono" inputmode="numeric" maxlength="4" placeholder="Time (now)" data-bind="time" value="${esc(draft.time)}" style="max-width:40%"></div>
+      <div class="row" style="margin-top:8px"><input type="date" data-bind="date" value="${esc(draft.date)}"><input type="text" class="mono" inputmode="numeric" maxlength="4" placeholder="Time (optional)" data-bind="time" value="${esc(draft.time)}" style="max-width:40%"></div>
     </details>
     <button class="btn pri full" style="margin-top:12px" data-act="saveNote">Log note</button>
   </div>
@@ -1006,10 +1006,10 @@ Trainee: ${t.name}. ${d.phase}, DOR #${d.ride}${d.phase==='Phase I'&&d.ride<=8?'
 ${prev?'Previous DOR ratings: '+JSON.stringify(prev.ratings):'This is the first DOR.'}
 Current draft ratings: ${JSON.stringify(d.ratings)}
 
-FTO field notes for ${d.date} (tone: + did well, - needs work, 0 observed; "rem" = remedial training minutes the FTO logged):
-${ns.map(n=>`[${n.time||'--'}] tone ${n.tone} | SEG ${n.cat||'untagged'} | ${n.call||''} ${n.caseNo?'#'+n.caseNo:''} | rem ${n.rem||0} | ${n.text}`).join('\n')}
+FTO field notes for the ${d.date} shift, in no guaranteed order (tone: + did well, - needs work, 0 observed; "rem" = remedial training minutes the FTO logged). Notes are often written after the fact, so they carry no reliable times:
+${ns.map(n=>`- tone ${n.tone} | SEG ${n.cat||'untagged'} | ${n.call||''} ${n.caseNo?'#'+n.caseNo:''} | rem ${n.rem||0} | ${n.text}`).join('\n')}
 
-Task: For each SEG the notes give evidence for (assign untagged notes to the best-fitting SEG; one note may support several), suggest a rating anchored to the SEG language and write the narrative: objective, behaviour-based, past tense, third person (call the trainee "Trainee" plus their last name), cite call type/case #, state what was corrected and how the trainee responded when the notes say so. Never invent facts. Ratings of 1, 2, 6, 7 must be justified by specific behaviour. Only report remedial minutes ("rem") for SEGs where the notes explicitly record remedial training. Pick the most acceptable area (SEG # + specific incident). Give a least acceptable area ONLY if one of your ratings is below 4; otherwise return null for it. Put any general observations that fit no SEG in "narrative".
+Task: For each SEG the notes give evidence for (assign untagged notes to the best-fitting SEG; one note may support several), suggest a rating anchored to the SEG language and write the narrative: objective, behaviour-based, past tense, third person (call the trainee "Trainee" plus their last name), cite call type/case #, state what was corrected and how the trainee responded when the notes say so. Never invent facts. Ratings of 1, 2, 6, 7 must be justified by specific behaviour. Only report remedial minutes ("rem") for SEGs where the notes explicitly record remedial training. Pick the most acceptable area (SEG # + specific incident). Give a least acceptable area ONLY if one of your ratings is below 4; otherwise return null for it. Put any general observations that fit no SEG in "narrative". Never state clock times or imply a time sequence (no "at 0942", "first", "later in the shift") unless a note's own text gives it.
 Return ONLY JSON: {"ratings":{"<seg#>":"1".."7"|"NO"},"comments":{"<seg#>":"..."},"rem":{"<seg#>":<minutes>},"most":{"cat":<seg#>,"text":"..."},"least":{"cat":<seg#>,"text":"..."}|null,"narrative":"..."}`;
   try{
     const out=await SAMPLE.json(prompt,{modelTier:'complex'});
@@ -1079,7 +1079,7 @@ const ACT={
   nday:a=>{noteFilter.day=a.dataset.v;render()},
   saveNote:()=>{
     const tx=($('#nText').value||'').trim();if(!tx){toast('Type or dictate a note first');return}
-    const t=T();const n={id:uid(),tid:t.id,ts:Date.now(),date:draft.date||today(),time:(draft.time||'').trim()||nowTime(),cat:draft.cat,tone:draft.tone,text:tx,call:draft.call.trim(),caseNo:draft.caseNo.trim(),rem:String(draft.rem||'').trim()};
+    const t=T();const n={id:uid(),tid:t.id,ts:Date.now(),date:draft.date||today(),time:(draft.time||'').trim(),cat:draft.cat,tone:draft.tone,text:tx,call:draft.call.trim(),caseNo:draft.caseNo.trim(),rem:String(draft.rem||'').trim()};
     S.notes[n.id]=n;persist('n_'+n.id,n);
     draft={text:'',tone:'0',cat:null,call:draft.call,caseNo:draft.caseNo,date:today(),time:'',rem:''};saveDraft();
     render();toast('Logged'+(n.cat?' to #'+n.cat:''));

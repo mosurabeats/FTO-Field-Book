@@ -1,7 +1,7 @@
 // Offline support. Network-first for the app's own files (revalidating past the HTTP cache so
 // updates arrive as soon as the phone is online), falling back to the saved copy offline.
 // Bump VERSION on every release.
-const VERSION = '6';
+const VERSION = '7';
 const CACHE = 'ten-eight-v' + VERSION;
 const FILES = ['./', 'index.html', 'js/standalone.js', 'js/vendor/jszip.min.js', 'js/vendor/jspdf.umd.min.js', 'js/vendor/jspdf.plugin.autotable.min.js', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/icon-32.png', 'manifest.webmanifest'];
 
