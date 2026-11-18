@@ -52,7 +52,7 @@ body{padding-bottom:calc(74px + var(--safe-b));min-height:100vh}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;border:0;background:none}
 .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
-header.top{position:sticky;top:0;z-index:20;background:var(--hdr);color:var(--hdrtx);padding:calc(10px + var(--safe-t)) 16px 10px;display:flex;align-items:center;gap:11px}
+header.top{position:sticky;top:0;z-index:20;background:var(--hdr);color:var(--hdrtx);border-bottom:1px solid var(--line);padding:calc(10px + var(--safe-t)) 16px 10px;display:flex;align-items:center;gap:11px}
 .badge{width:36px;height:36px;flex:none;display:block}
 .ttl{flex:1;min-width:0}
 .ttl b{display:block;font-family:Archivo,Inter,sans-serif;font-weight:700;font-size:16px;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -60,7 +60,6 @@ header.top{position:sticky;top:0;z-index:20;background:var(--hdr);color:var(--hd
 .sync{font-size:11px;color:var(--hdrmu);display:flex;align-items:center;gap:5px;white-space:nowrap}
 .dot{width:7px;height:7px;border-radius:50%;background:#7F93B8}
 .dot.ok{background:#3CCB8F}.dot.err{background:#FF7A6E}.dot.wait{background:#F0B54A}
-header.top::after{content:'';position:absolute;left:0;right:0;bottom:-4px;height:4px;background:var(--stripes)}
 main{padding:18px 14px 30px;max-width:720px;margin:0 auto}
 nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--tabbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);display:flex;padding:6px 6px calc(6px + var(--safe-b))}
 nav.tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;color:var(--mu);font-size:10.5px;font-weight:600;border-radius:10px}
