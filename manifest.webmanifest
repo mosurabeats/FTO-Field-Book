@@ -1,14 +1,24 @@
 {
-  "name": "FTO Field Book",
-  "short_name": "FTO",
-  "description": "Field training notes, DORs on the FTEP-1 form, Standard Task Checklist and remedial training plans.",
+  "name": "10-8",
+  "short_name": "10-8",
+  "description": "10-8 \u2014 field training notes, DORs on the FTEP-1 form, Standard Task Checklist and remedial training plans.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0b0f14",
-  "theme_color": "#0b0f14",
+  "background_color": "#0F2A5C",
+  "theme_color": "#0F2A5C",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
