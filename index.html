@@ -556,7 +556,7 @@ function vDor(){
   </div>
   ${!locked&&(newNotes||SAMPLE)?`<div class="card" style="border-color:var(--ailine)">
     ${newNotes?`<div class="row" style="margin-bottom:${SAMPLE?10:0}px"><span class="grow small">${newNotes} new note${newNotes>1?'s':''} for this date since the DOR was built.</span><button class="btn sm" data-act="repull">Pull in</button></div>`:''}
-    ${SAMPLE?`<button class="btn ai full" data-act="aiDraft" id="aiBtn">✦ Draft ratings & narrative with Claude</button><div class="small muted" style="margin-top:6px">Reads this shift's notes against your SEGs and suggests ratings and documentation. It never sets NRT. Every ✦ is a suggestion until you check it.</div><div id="aiStatus"></div>`:''}
+    ${SAMPLE?`<button class="btn ai full" data-act="aiDraft" id="aiBtn">✦ Draft ratings & narrative with Claude</button><div class="small muted" style="margin-top:6px">Reads this shift's notes against your SEGs and suggests ratings and documentation. It never sets NRT. Ratings and narratives you set yourself are kept on a redraft: Claude writes around them. Every ✦ is a suggestion until you check it.</div><div id="aiStatus"></div>`:''}
   </div>`:''}
   ${!locked&&v.err.length?`<div class="warnbox"><b>Required before final</b><ul style="margin:4px 0 0;padding-left:18px">${v.err.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
   ${!locked&&v.warn.length?`<div class="hint"><b>Check</b><ul style="margin:4px 0 0;padding-left:18px">${v.warn.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
@@ -802,8 +802,8 @@ function rateSheet(n,instant){
     <div class="row" style="margin-top:14px"><button class="btn grow" data-act="rateNav" data-dir="-1">‹ Prev</button><button class="btn pri grow" data-act="closeSheet">Done</button><button class="btn grow" data-act="rateNav" data-dir="1">Next ›</button></div>`,()=>render(),instant);
   const sh=$('#sheet');const save=()=>saveDorSoon(d);
   const req=()=>{$('#cReq').style.display=((['1','2','6','7'].includes(r)||d.rem[n]||d.nrt[n])&&!$('#rCom').value.trim())?'inline':'none'};req();
-  sh.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{if(locked)return;r=b.dataset.r;d.ratings[n]=r;sh.querySelectorAll('[data-r]').forEach(x=>x.classList.toggle('on',x.dataset.r===r));req();save()});
-  $('#rCom').oninput=e=>{d.comments[n]=e.target.value;req();save()};
+  sh.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{if(locked)return;r=b.dataset.r;d.ratings[n]=r;manualOf(d).ratings[n]=true;if(d.aiCats)d.aiCats=d.aiCats.filter(x=>x!==n);sh.querySelectorAll('[data-r]').forEach(x=>x.classList.toggle('on',x.dataset.r===r));req();save()});
+  $('#rCom').oninput=e=>{d.comments[n]=e.target.value;manualOf(d).comments[n]=!!e.target.value.trim();req();save()};
   const rc=$('#remChk');if(rc){rc.onchange=()=>{d.rem[n]=rc.checked;if(!rc.checked)d.time[n]='';$('#remBox').classList.toggle('on',rc.checked);req();save()};
     $('#remTime').oninput=e=>{d.time[n]=e.target.value;if(e.target.value&&!d.rem[n]){d.rem[n]=true;rc.checked=true;$('#remBox').classList.add('on')}req();save()};
     $('#nrtChk').onchange=e=>{d.nrt[n]=e.target.checked;e.target.closest('.tog').classList.toggle('on',e.target.checked);if(e.target.checked&&rtpDone<3)toast(`Heads up: NRT needs 3 completed RTPs in #${n} — ${rtpDone} logged`,3500);req();save()}}
@@ -989,40 +989,48 @@ function checklistText(t){
 // ================= Claude assists =================
 const segBrief=t=>segsFor(t).map(s=>`#${s.n} ${s.name}: ${s.d} | 1=${s.a1} | 4=${s.a4} | 7=${s.a7}`).join('\n');
 const PROGRAM=t=>`the ${P().agency||'police department'} Field Training & Evaluation Program (Vermont Criminal Justice Council, Level ${t.level} officer)`;
+const VOICE=`Write in the FIRST PERSON as the FTO ("I observed", "I instructed", "I corrected"). Refer to the trainee only as "Trainee" or "the trainee": never by name.`;
+function manualOf(d){d.manual=d.manual||{ratings:{},comments:{}};d.manual.ratings=d.manual.ratings||{};d.manual.comments=d.manual.comments||{};return d.manual}
 async function aiDraft(){
-  const d=S.dors[curDor];const t=TR(d.tid);
+  const d=S.dors[curDor];const t=TR(d.tid);const man=manualOf(d);
   const ns=notesFor(d.tid).filter(n=>n.date===d.date).reverse();
   if(!ns.length){toast('No notes on this date to draft from');return}
   const btn=$('#aiBtn');btn.disabled=true;$('#aiStatus').innerHTML='<div class="aiwork" style="margin-top:8px"><span class="spin"></span>Reading notes against the SEGs…</div>';
   const prev=prevDor(d.tid,d.date);
+  const fixedR={};for(const k in man.ratings)if(man.ratings[k]&&d.ratings[k])fixedR[k]=d.ratings[k];
+  const fixedC={};for(const k in man.comments)if(man.comments[k]&&(d.comments[k]||'').trim())fixedC[k]=d.comments[k];
+  const keepMost=man.most&&d.most.cat,keepLeast=man.least,keepNarr=man.narrative&&(d.narrative||'').trim();
   const prompt=`You help a Field Training Officer complete a Daily Observation Report (FTEP-1 DOR) for ${PROGRAM(t)}.
 Rating scale: 1 totally unacceptable; 2 a little better than 1; 3 close to 4 but not yet minimally acceptable; 4 minimum acceptable, able to work solo in a safe, skillful, productive and professional manner; 5-6 above acceptable; 7 superior; "NO" not observed.
 Narrative documentation is REQUIRED for ratings of 1, 2, 6, 7 and any remedial training (REM). Never assign NRT.
 DOR writing standards: SET THE STAGE, USE QUOTES (only quotes present in the notes), USE LISTS, INCLUDE REMEDIAL, FRONT = BACK (ratings must match the narrative), USE SEG language, REMEMBER YOUR AUDIENCE (supervisor, trainee, possibly a review board), DO NOT PREDICT future performance.
+${VOICE}
 Standardized Evaluation Guidelines (category: description | 1 | 4 | 7):
 ${segBrief(t)}
 
-Trainee: ${t.name}. ${d.phase}, DOR #${d.ride}${d.phase==='Phase I'&&d.ride<=8?' (limbo/orientation weeks)':''}.
+${d.phase}, DOR #${d.ride}${d.phase==='Phase I'&&d.ride<=8?' (limbo/orientation weeks)':''}.
 ${prev?'Previous DOR ratings: '+JSON.stringify(prev.ratings):'This is the first DOR.'}
-Current draft ratings: ${JSON.stringify(d.ratings)}
+RATINGS THE FTO HAS SET (final, do not change them; every narrative you write for these SEGs must support exactly this rating): ${JSON.stringify(fixedR)}
+NARRATIVES THE FTO HAS WRITTEN (final, do not rewrite or return them): ${JSON.stringify(Object.keys(fixedC))}
+${keepMost?'The FTO has already written the most acceptable area: do not return "most".':''}${keepLeast?' The FTO has already written the least acceptable area: do not return "least".':''}${keepNarr?' The FTO has written the general narrative: do not return "narrative".':''}
 
 FTO field notes for the ${d.date} shift, in no guaranteed order (tone: + did well, - needs work, 0 observed; "rem" = remedial training minutes the FTO logged). Notes are often written after the fact, so they carry no reliable times:
 ${ns.map(n=>`- tone ${n.tone} | SEG ${n.cat||'untagged'} | ${n.call||''} ${n.caseNo?'#'+n.caseNo:''} | rem ${n.rem||0} | ${n.text}`).join('\n')}
 
-Task: For each SEG the notes give evidence for (assign untagged notes to the best-fitting SEG; one note may support several), suggest a rating anchored to the SEG language and write the narrative: objective, behaviour-based, past tense, third person (call the trainee "Trainee" plus their last name), cite call type/case #, state what was corrected and how the trainee responded when the notes say so. Never invent facts. Ratings of 1, 2, 6, 7 must be justified by specific behaviour. Only report remedial minutes ("rem") for SEGs where the notes explicitly record remedial training. Pick the most acceptable area (SEG # + specific incident). Give a least acceptable area ONLY if one of your ratings is below 4; otherwise return null for it. Put any general observations that fit no SEG in "narrative". Never state clock times or imply a time sequence (no "at 0942", "first", "later in the shift") unless a note's own text gives it.
+Task: For each SEG the notes give evidence for (assign untagged notes to the best-fitting SEG; one note may support several), give a rating anchored to the SEG language (use the FTO's rating where one is set) and write the narrative: objective, behaviour-based, past tense, first person, cite call type/case #, state what I corrected and how the trainee responded when the notes say so. Also write a narrative for every SEG in the FTO's set ratings that has no FTO-written narrative, even if the notes say little: then keep it short and factual. Never invent facts. Ratings of 1, 2, 6, 7 must be justified by specific behaviour. Only report remedial minutes ("rem") for SEGs where the notes explicitly record remedial training. Pick the most acceptable area (SEG # + specific incident). Give a least acceptable area ONLY if a final rating (yours or the FTO's) is below 4; otherwise return null for it. Put any general observations that fit no SEG in "narrative". Never state clock times or imply a time sequence (no "at 0942", "first", "later in the shift") unless a note's own text gives it.
 Return ONLY JSON: {"ratings":{"<seg#>":"1".."7"|"NO"},"comments":{"<seg#>":"..."},"rem":{"<seg#>":<minutes>},"most":{"cat":<seg#>,"text":"..."},"least":{"cat":<seg#>,"text":"..."}|null,"narrative":"..."}`;
   try{
     const out=await SAMPLE.json(prompt,{modelTier:'complex'});
     const valid=new Set(segsFor(t).map(s=>String(s.n)));const okR=new Set([...RATINGS,'NO']);
     d.aiCats=[];
-    for(const [k,v] of Object.entries(out.ratings||{}))if(valid.has(String(k))&&okR.has(String(v))){d.ratings[k]=String(v);d.aiCats.push(+k)}
-    for(const [k,v] of Object.entries(out.comments||{}))if(valid.has(String(k))&&v)d.comments[k]=String(v);
-    for(const [k,v] of Object.entries(out.rem||{}))if(valid.has(String(k))&&+v>0){d.rem[k]=true;d.time[k]=String(Math.round(+v))}
-    if(out.most&&valid.has(String(out.most.cat)))d.most={cat:+out.most.cat,text:String(out.most.text||'')};
-    if(out.least&&valid.has(String(out.least.cat)))d.least={cat:+out.least.cat,text:String(out.least.text||'')};else if(!failing(d))d.least={cat:null,text:''};
-    if(out.narrative)d.narrative=String(out.narrative);
+    for(const [k,v] of Object.entries(out.ratings||{}))if(valid.has(String(k))&&okR.has(String(v))&&!man.ratings[k]){d.ratings[k]=String(v);d.aiCats.push(+k)}
+    for(const [k,v] of Object.entries(out.comments||{}))if(valid.has(String(k))&&v&&!fixedC[k]){d.comments[k]=String(v);if(!d.aiCats.includes(+k))d.aiCats.push(+k)}
+    for(const [k,v] of Object.entries(out.rem||{}))if(valid.has(String(k))&&+v>0&&!d.time[k]){d.rem[k]=true;d.time[k]=String(Math.round(+v))}
+    if(!keepMost&&out.most&&valid.has(String(out.most.cat)))d.most={cat:+out.most.cat,text:String(out.most.text||'')};
+    if(!keepLeast){if(out.least&&valid.has(String(out.least.cat)))d.least={cat:+out.least.cat,text:String(out.least.text||'')};else if(!failing(d))d.least={cat:null,text:''}}
+    if(!keepNarr&&out.narrative)d.narrative=String(out.narrative);
     d.ai=true;ns.forEach(n=>{if(!d.used.includes(n.id))d.used.push(n.id)});
-    saveDor(d);render();toast(`Claude drafted ${d.aiCats.length} SEGs — check each ✦`,3500);
+    saveDor(d);render();const kept=Object.keys(fixedR).length+Object.keys(fixedC).length;toast(`Claude drafted ${d.aiCats.length} SEGs${kept?' · your own ratings & narratives kept':''} — check each ✦`,3800);
   }catch(e){
     if(e&&e.code==='not_granted'){SAMPLE=null;render();return}
     $('#aiStatus').innerHTML=`<div class="small" style="color:var(--neg);margin-top:8px">${e&&e.code==='rate_limited'?'Busy — try again in a minute.':'Couldn’t draft this time. Your DOR is unchanged.'}</div>`;btn.disabled=false;
@@ -1040,7 +1048,7 @@ Recent DOR entries for this SEG: ${JSON.stringify(ds)}
 FTO notes for this SEG: ${ns.join(' || ')}
 Prior RTPs in this SEG: ${JSON.stringify(prior)}
 Existing draft deficiency text: ${r.deficiency||'(none)'}
-Write two plain-text sections in the FTO's voice. "deficiency": define the problem specifically with dated examples from the data, measured against the SEG's acceptable standard, and describe the training already conducted. "assignment": specific, measurable training assignments with clear performance goals and a time frame (e.g. "practice self-initiated car stops daily for 4 shifts: at least 4 F.I.s and 2 citations per shift"), and state that the trainee is expected to perform at a satisfactory level in this area. Use only facts in the data. Return ONLY JSON {"deficiency":"...","assignment":"..."}`;
+Write two plain-text sections. ${VOICE} "deficiency": define the problem specifically with dated examples from the data, measured against the SEG's acceptable standard, and describe the training already conducted. "assignment": specific, measurable training assignments with clear performance goals and a time frame (e.g. "practice self-initiated car stops daily for 4 shifts: at least 4 F.I.s and 2 citations per shift"), and state that the trainee is expected to perform at a satisfactory level in this area. Use only facts in the data. Return ONLY JSON {"deficiency":"...","assignment":"..."}`;
   try{const out=await SAMPLE.json(prompt,{modelTier:'complex'});if(out.deficiency)r.deficiency=String(out.deficiency);if(out.assignment)r.assignment=String(out.assignment);persist('r_'+r.id,r);render();toast('Drafted — review before the trainee signs')}
   catch(e){if(e&&e.code==='not_granted'){SAMPLE=null;render();return}$('#aiRtpStatus').innerHTML='<div class="small" style="color:var(--neg);margin-top:8px">Couldn’t draft right now.</div>';btn.disabled=false}
 }
@@ -1053,13 +1061,14 @@ async function aiSummary(kind){
   const ck=checksFor(t.id).items;const due=phaseDue(t.phase);const missing=CHECKLIST.flatMap(s=>s.items.filter(i=>i.ph&&due.includes(i.ph)&&!(ck[i.id]&&ck[i.id].p)).map(i=>i.t)).slice(0,40);
   const ask=kind==='week'?`Write the "COMMENTS REGARDING STRENGTHS, WEAKNESSES AND PROGRESS" section of the FTEP Supervisor Weekly Report: overall performance measured by the SEGs, specific strengths and weaknesses with examples, whether progress is increasing, decreasing or unchanged, and remedial training provided with its effect and any further training needed. Under 250 words.`
   :`Write a Phase Evaluation Form summary for ${t.phase}: 1) strengths with specific examples; 2) weaknesses with specific examples; 3) where remedial training was given or special testing done, a brief description of the process and result; 4) recommendations for follow-up training for the next FTO/phase; 5) a clear statement of whether the trainee IS or IS NOT currently performing at the level of a solo patrol officer, based only on the record. Under 400 words.`;
-  const prompt=`You help a Field Training Officer in ${PROGRAM(t)}. Trainee: ${t.name}, currently ${t.phase}.
+  const prompt=`You help a Field Training Officer in ${PROGRAM(t)}. The trainee is currently in ${t.phase}.
+${VOICE}
 SEGs: ${segsFor(t).map(s=>`#${s.n} ${s.name}`).join('; ')}. Scale: 4 = minimum acceptable for solo work. REM = remedial training given (TIME minutes). NRT = not responding to training.
 DORs: ${JSON.stringify(compact)}
 Remedial Training Plans: ${JSON.stringify(rt)}
 Standard Task Checklist items due by this phase not yet performed: ${missing.join('; ')||'none'}
 ${ask}
-Plain text, no markdown symbols, FTO's voice, past tense, only facts in the data, do not predict future performance.`;
+Plain text, no markdown symbols, first person as the FTO, past tense, only facts in the data, do not predict future performance.`;
   try{
     const r=await SAMPLE(prompt,{modelTier:'complex',onText:({text})=>{out.innerHTML=`<div class="card"><h3>✦ Draft</h3><div class="preview" style="background:var(--p2);color:var(--tx);font-family:Inter;font-size:13.5px">${esc(text)}</div></div>`}});
     const txt=r.text;out.innerHTML=`<div class="card"><h3>✦ Draft — review & edit before you use it</h3><div class="preview" style="background:var(--p2);color:var(--tx);font-family:Inter;font-size:13.5px;max-height:none">${esc(txt)}</div><button class="btn full" style="margin-top:8px" id="sumCopy">Copy</button></div>`;
@@ -1126,7 +1135,7 @@ document.addEventListener('input',e=>{
   const el=e.target;
   if(el.dataset.bind){draft[el.dataset.bind]=el.value;saveDraft();if(el.dataset.bind==='rem')el.closest('.tog').classList.toggle('on',!!el.value);return}
   if(el.id==='taskQ'){taskQ=el.value;clearTimeout(ACT._tq);ACT._tq=setTimeout(()=>{const pos=el.selectionStart;render();const n=$('#taskQ');if(n){n.focus();n.setSelectionRange(pos,pos)}},250);return}
-  if(el.dataset.dor){const d=S.dors[curDor];if(!d||d.status==='final')return;const path=el.dataset.dor.split('.');let v=el.value;if(path[1]==='cat')v=v?+v:null;if(path.length===2)d[path[0]][path[1]]=v;else d[path[0]]=v;saveDorSoon(d);return}
+  if(el.dataset.dor){const d=S.dors[curDor];if(!d||d.status==='final')return;const path=el.dataset.dor.split('.');if(['most','least','narrative'].includes(path[0]))manualOf(d)[path[0]]=true;let v=el.value;if(path[1]==='cat')v=v?+v:null;if(path.length===2)d[path[0]][path[1]]=v;else d[path[0]]=v;saveDorSoon(d);return}
   if(el.dataset.rtp){const r=S.rtps[curRtp];if(!r)return;let v=el.value;if(el.dataset.rtp==='cat')v=v?+v:null;r[el.dataset.rtp]=v;persistSoon('r_'+r.id,()=>S.rtps[r.id]);return}
   if(el.dataset.prof){const path=el.dataset.prof.split('.');if(path.length===2)P()[path[0]][path[1]]=el.value;else P()[path[0]]=el.value;persistSoon('profile',()=>S.profile);return}
 });
