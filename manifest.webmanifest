@@ -1,7 +1,7 @@
 {
-  "name": "10-8",
-  "short_name": "10-8",
-  "description": "10-8 \u2014 field training notes, DORs on the FTEP-1 form, Standard Task Checklist and remedial training plans.",
+  "name": "FTO FieldBook",
+  "short_name": "FieldBook",
+  "description": "FTO FieldBook \u2014 field training notes, DORs on the FTEP-1 form, Standard Task Checklist and remedial training plans.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

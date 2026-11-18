@@ -6,11 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#2F3943">
-<meta name="apple-mobile-web-app-title" content="10-8">
+<meta name="apple-mobile-web-app-title" content="FieldBook">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<title>10-8</title>
+<title>FTO FieldBook</title>
 <script>try{var m=localStorage.getItem('fto_theme')||'auto';if(m==='dark')m='night';var t=m==='auto'?(matchMedia('(prefers-color-scheme: dark)').matches?'night':'light'):m;document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -195,8 +195,8 @@ details summary{cursor:pointer;color:var(--mu);font-size:13px;font-weight:600;pa
 </head>
 <body>
 <header class="top">
-  <svg class="badge" viewBox="0 0 100 100" role="img" aria-label="10-8"><rect width="100" height="100" rx="22" fill="#4E5C6A"></rect><path d="M50 9 L78 19 V42 C78 60 66 72 50 79 C34 72 22 60 22 42 V19 Z" fill="#3C4753" stroke="#E7E7E1" stroke-width="4.5"></path><text x="50" y="50.5" text-anchor="middle" font-family="Archivo Black, Archivo, Arial Black, sans-serif" font-weight="800" font-size="19" fill="#E7E7E1">10-8</text><rect x="0" y="86" width="25" height="8" fill="#33658C"></rect><rect x="25" y="86" width="25" height="8" fill="#39B4F2"></rect><rect x="50" y="86" width="25" height="8" fill="#E7E7E1"></rect><rect x="75" y="86" width="25" height="8" fill="#E8343B"></rect></svg>
-  <div class="ttl"><b id="hdrName">10-8</b><small id="hdrSub">Field training · FTEP</small></div>
+  <svg class="badge" viewBox="0 0 100 100" role="img" aria-label="FTO FieldBook"><defs><clipPath id="bdg"><rect width="100" height="100" rx="22"></rect></clipPath></defs><g clip-path="url(#bdg)"><rect width="100" height="100" fill="#4E5C6A"></rect><path d="M50 13 L77 23 V45 C77 63 65 75 50 82 C35 75 23 63 23 45 V23 Z" fill="#3C4753" stroke="#E7E7E1" stroke-width="5" stroke-linejoin="round"></path><text x="50" y="54.5" text-anchor="middle" font-family="Archivo Black, Archivo, Arial Black, sans-serif" font-weight="800" font-size="22" fill="#E7E7E1">FTO</text></g></svg>
+  <div class="ttl"><b id="hdrName">FTO FieldBook</b><small id="hdrSub">Field training · FTEP</small></div>
   <div class="sync"><span class="dot" id="syncDot"></span><span id="syncTx">local</span></div>
 </header>
 <main id="app"></main>
@@ -396,7 +396,7 @@ function recentCats(){
 // ================= render =================
 function header(){
   const t=T();
-  $('#hdrName').textContent=t?t.name:'10-8';
+  $('#hdrName').textContent=t?t.name:'FTO FieldBook';
   if(t){const ds=dorsFor(t.id).filter(d=>d.phase===t.phase);$('#hdrSub').textContent=`Level ${t.level} · ${t.phase} · ${ds.length} ride${ds.length===1?'':'s'} logged`}
   else $('#hdrSub').textContent=(P().agency||'')+' FTEP';
   const map={dor:'dors',rtp:'dors'};
@@ -410,7 +410,7 @@ function render(){
   app.innerHTML=({notes:vNotes,dors:vDors,dor:vDor,rtp:vRtp,tasks:vTasks,trends:vTrends,setup:vSetup}[view]||vNotes)();
 }
 function onboard(){
-  return `<div class="card" style="margin-top:20px"><h3>10-8 · Get started</h3>
+  return `<div class="card" style="margin-top:20px"><h3>FTO FieldBook · Get started</h3>
   <p style="margin:0 0 12px">Add your trainee. Log observations on calls, and each shift's DOR fills itself in from those notes, using the 40 VCJTC Level II/III SEGs. When you're done it exports as your FTEP-1 form.</p>
   <button class="btn pri full" data-act="editTrainee">Add trainee</button></div>`;
 }
@@ -1117,7 +1117,7 @@ const ACT={
   saveKey:()=>{const v=($('#apiKey').value||'').trim();if(!/^sk-ant-/.test(v)){toast('That doesn’t look like an Anthropic API key');return}localStorage.setItem('fto_api_key',v);SAMPLE=window.__ftoSampler&&window.__ftoSampler();render();toast('Key saved — ✦ drafting is on')},
   clearKey:()=>{localStorage.removeItem('fto_api_key');SAMPLE=null;render();toast('Key removed')},
   dismissInstall:()=>{localStorage.setItem('fto_install_seen','1');render()},
-  exportJson:()=>{try{localStorage.setItem('fto_last_backup',today())}catch(e){}const data=JSON.stringify({app:'fto-fieldbook',v:2,exported:new Date().toISOString(),...S},null,1);if(DL)save(`10-8_backup_${today()}.json`,data);else copyText(data)},
+  exportJson:()=>{try{localStorage.setItem('fto_last_backup',today())}catch(e){}const data=JSON.stringify({app:'fto-fieldbook',v:2,exported:new Date().toISOString(),...S},null,1);if(DL)save(`FieldBook_backup_${today()}.json`,data);else copyText(data)},
   mic:a=>{if(!DICT)return;if(dictState==='listening'){DICT.stop().catch(()=>{});return}dictTarget=a.dataset.t;DICT.start().catch(e=>{if(e&&e.code==='not_granted'){DICT=null;render();toast('Mic not allowed — use your keyboard’s dictation key')}})},
 };
 document.addEventListener('click',e=>{const a=e.target.closest('[data-act]');if(!a)return;const f=ACT[a.dataset.act];if(f)f(a,e)});
@@ -1140,7 +1140,7 @@ document.addEventListener('change',e=>{
   if(el.id==='importFile'&&el.files[0]){const rd=new FileReader();rd.onload=()=>{try{const j=JSON.parse(rd.result);if(!j.notes||!j.profile)throw 0;
     confirmSheet(`Import ${Object.keys(j.notes).length} notes and ${Object.keys(j.dors||{}).length} DORs? This merges with what's here.`,'Import',()=>{
       const p=S.profile;(j.profile.trainees||[]).forEach(t=>{if(!p.trainees.find(x=>x.id===t.id))p.trainees.push(t)});if(!p.active)p.active=j.profile.active;if(!p.fto.name&&j.profile.fto)p.fto=Object.assign(p.fto,j.profile.fto);ensureProfile();
-      Object.assign(S.notes,j.notes);Object.values(j.dors||{}).forEach(d=>S.dors[d.id]=normDor(d));Object.assign(S.rtps,j.rtps||{});Object.assign(S.checks,j.checks||{});uploadAll();cacheSave();render();toast('Imported')})}catch(_){toast('That file isn’t a 10-8 backup')}};rd.readAsText(el.files[0]);el.value=''}
+      Object.assign(S.notes,j.notes);Object.values(j.dors||{}).forEach(d=>S.dors[d.id]=normDor(d));Object.assign(S.rtps,j.rtps||{});Object.assign(S.checks,j.checks||{});uploadAll();cacheSave();render();toast('Imported')})}catch(_){toast('That file isn’t an FTO FieldBook backup')}};rd.readAsText(el.files[0]);el.value=''}
 });
 
 // ================= boot =================
