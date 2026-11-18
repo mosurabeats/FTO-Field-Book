@@ -1027,11 +1027,13 @@ Return ONLY JSON: {"ratings":{"<seg#>":"1".."7"|"NO"},"comments":{"<seg#>":"..."
     const valid=new Set(segsFor(t).map(s=>String(s.n)));const okR=new Set([...RATINGS,'NO']);
     d.aiCats=[];
     for(const [k,v] of Object.entries(out.ratings||{}))if(valid.has(String(k))&&okR.has(String(v))&&!man.ratings[k]){d.ratings[k]=String(v);d.aiCats.push(+k)}
+    // Claude's draft replaces the raw note text the app pre-filled; anything the FTO typed stays
+    segsFor(t).forEach(s=>{const k=String(s.n);if(!fixedC[k])d.comments[k]=''});
     for(const [k,v] of Object.entries(out.comments||{}))if(valid.has(String(k))&&v&&!fixedC[k]){d.comments[k]=String(v);if(!d.aiCats.includes(+k))d.aiCats.push(+k)}
     for(const [k,v] of Object.entries(out.rem||{}))if(valid.has(String(k))&&+v>0&&!d.time[k]){d.rem[k]=true;d.time[k]=String(Math.round(+v))}
     if(!keepMost&&out.most&&valid.has(String(out.most.cat)))d.most={cat:+out.most.cat,text:String(out.most.text||'')};
     if(!keepLeast){if(out.least&&valid.has(String(out.least.cat)))d.least={cat:+out.least.cat,text:String(out.least.text||'')};else if(!failing(d))d.least={cat:null,text:''}}
-    if(!keepNarr&&out.narrative)d.narrative=String(out.narrative);
+    if(!keepNarr)d.narrative=String(out.narrative||'').trim();
     d.ai=true;ns.forEach(n=>{if(!d.used.includes(n.id))d.used.push(n.id)});
     saveDor(d);render();const kept=Object.keys(fixedR).length+Object.keys(fixedC).length;toast(`Claude drafted ${d.aiCats.length} SEGs${kept?' · your own ratings & narratives kept':''} — check each ✦`,3800);
   }catch(e){
