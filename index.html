@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#2F3943">
+<meta name="theme-color" content="#17181B">
 <meta name="apple-mobile-web-app-title" content="FieldBook">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>FTO FieldBook</title>
-<script>try{var m=localStorage.getItem('fto_theme')||'auto';if(m==='dark')m='night';var t=m==='auto'?(matchMedia('(prefers-color-scheme: dark)').matches?'night':'light'):m;document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}</script>
+<script>try{if(!localStorage.getItem('fto_theme_v2')){localStorage.setItem('fto_theme','k11');localStorage.setItem('fto_theme_v2','1')}var m=localStorage.getItem('fto_theme')||'k11';var M={light:'k11s',night:'k11',dark:'k11'};m=M[m]||m;var t=m==='auto'?(matchMedia('(prefers-color-scheme: dark)').matches?'k11':'k11s'):m;document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='k11'}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
@@ -46,6 +46,29 @@
   --hi:#D42A31;--hitx:#FFFFFF;--hi2:#8FD6F8;--hisoft:rgba(57,180,242,.15);--ring:#E7E7E1;
   color-scheme:dark;
 }
+[data-theme=k11]{
+  --bg:#1F2023;--p1:#26282C;--p2:#2C2E32;--p3:#36383D;--line:#3A3D42;--tx:#DEDFE1;--tx2:#C9CBCF;--mu:#A3A6AC;--dim:#80838A;
+  --acc:#9FBCD6;--acc2:#B9CFE3;--acctx:#16181B;--accsoft:rgba(159,188,214,.15);--pos:#9FBCD6;--possoft:rgba(159,188,214,.15);--neg:#FF6B62;--negsoft:rgba(216,38,46,.24);--neu:#80838A;--blue:#9FBCD6;
+  --hdr:#17181B;--hdrtx:#DEDFE1;--hdrmu:#A3A6AC;--tabbg:rgba(23,24,27,.97);
+  --rlo:#FF9A93;--rlo-bg:rgba(216,38,46,.30);--rmid:#F2C18D;--rmid-bg:rgba(240,160,80,.18);--rok:#DEDFE1;--rok-bg:#36383D;--rhi:#C3D7EA;--rhi-bg:rgba(159,188,214,.24);
+  --aibg:linear-gradient(135deg,#2C3A47,#26323D);--ailine:#4A6378;--aitx:#DCE8F3;--card-shadow:none;
+  --sp-mid:#9FBCD6;--sp-axis:#44474D;--sp-dot:#DEDFE1;--secondary:#5D7489;
+  --hi:#D8262E;--hitx:#FFFFFF;--hi2:#EFB3B5;--hisoft:rgba(239,179,181,.13);--ring:#DEDFE1;
+  color-scheme:dark;
+}
+[data-theme=k11s]{
+  --bg:#D6D7DA;--p1:#ECECEE;--p2:#E1E2E5;--p3:#CFD1D5;--line:#BEC0C5;--tx:#1F2023;--tx2:#2C2E32;--mu:#4F5258;--dim:#676A71;
+  --acc:#3F6F99;--acc2:#3F6F99;--acctx:#FFFFFF;--accsoft:rgba(63,111,153,.12);--pos:#2F5F8A;--possoft:rgba(63,111,153,.13);--neg:#B81F27;--negsoft:rgba(216,38,46,.11);--neu:#8A8D93;--blue:#3F6F99;
+  --hdr:#1F2023;--hdrtx:#DEDFE1;--hdrmu:#A3A6AC;--tabbg:rgba(236,236,238,.97);
+  --rlo:#B81F27;--rlo-bg:rgba(216,38,46,.13);--rmid:#8A5300;--rmid-bg:rgba(200,120,0,.14);--rok:#1F2023;--rok-bg:#DCDDE0;--rhi:#2F5F8A;--rhi-bg:rgba(63,111,153,.15);
+  --aibg:linear-gradient(135deg,#E2EAF2,#D9E3EE);--ailine:#A9BFD3;--aitx:#2C5378;--card-shadow:0 1px 2px rgba(31,32,35,.10);
+  --sp-mid:#3F6F99;--sp-axis:#B5B8BD;--sp-dot:#4F5258;--secondary:#8FAAC3;
+  --hi:#D8262E;--hitx:#FFFFFF;--hi2:#B81F27;--hisoft:rgba(216,38,46,.09);--ring:#DEDFE1;
+  color-scheme:light;
+}
+.badge.k11{display:none}
+[data-theme=k11] .badge.std,[data-theme=k11s] .badge.std{display:none}
+[data-theme=k11] .badge.k11,[data-theme=k11s] .badge.k11{display:block}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 Inter,system-ui,-apple-system,sans-serif}
 body{padding-bottom:calc(74px + var(--safe-b));min-height:100vh}
@@ -195,7 +218,7 @@ details summary{cursor:pointer;color:var(--mu);font-size:13px;font-weight:600;pa
 </head>
 <body>
 <header class="top">
-  <svg class="badge" viewBox="0 0 100 100" role="img" aria-label="FTO FieldBook"><defs><clipPath id="bdg"><rect width="100" height="100" rx="22"></rect></clipPath><clipPath id="bpill"><rect x="24" y="62" width="52" height="6" rx="3"></rect></clipPath></defs><g clip-path="url(#bdg)"><rect width="100" height="100" fill="#4E5C6A"></rect><text x="50" y="54" text-anchor="middle" font-family="Archivo Black, Archivo, Arial Black, sans-serif" font-weight="800" font-size="31" fill="#E7E7E1">FTO</text><g clip-path="url(#bpill)"><rect x="24" y="62" width="13" height="6" fill="#33658C"></rect><rect x="37" y="62" width="13" height="6" fill="#39B4F2"></rect><rect x="50" y="62" width="13" height="6" fill="#E7E7E1"></rect><rect x="63" y="62" width="13" height="6" fill="#E8343B"></rect></g></g></svg>
+  <svg class="badge std" viewBox="0 0 100 100" role="img" aria-label="FTO FieldBook"><defs><clipPath id="bdg"><rect width="100" height="100" rx="22"></rect></clipPath><clipPath id="bpill"><rect x="24" y="62" width="52" height="6" rx="3"></rect></clipPath></defs><g clip-path="url(#bdg)"><rect width="100" height="100" fill="#4E5C6A"></rect><text x="50" y="54" text-anchor="middle" font-family="Archivo Black, Archivo, Arial Black, sans-serif" font-weight="800" font-size="31" fill="#E7E7E1">FTO</text><g clip-path="url(#bpill)"><rect x="24" y="62" width="13" height="6" fill="#33658C"></rect><rect x="37" y="62" width="13" height="6" fill="#39B4F2"></rect><rect x="50" y="62" width="13" height="6" fill="#E7E7E1"></rect><rect x="63" y="62" width="13" height="6" fill="#E8343B"></rect></g></g></svg><svg class="badge k11" viewBox="0 0 100 100" role="img" aria-label="FTO FieldBook"><defs><clipPath id="bk11"><rect width="100" height="100" rx="22"></rect></clipPath></defs><g clip-path="url(#bk11)"><rect width="100" height="100" fill="#1F2023"></rect><text x="50" y="54" text-anchor="middle" font-family="Archivo Black, Archivo, Arial Black, sans-serif" font-weight="800" font-size="31" fill="#DEDFE1">FTO</text><rect x="14.0" y="66" width="4.6" height="7" rx="1" fill="#FF3B2F"></rect><rect x="20.6" y="66" width="4.6" height="7" rx="1" fill="#FF3B2F"></rect><rect x="27.2" y="66" width="4.6" height="7" rx="1" fill="#FF3B2F"></rect><rect x="33.8" y="66" width="4.6" height="7" rx="1" fill="#FF3B2F"></rect><rect x="40.4" y="66" width="4.6" height="7" rx="1" fill="#FF3B2F"></rect><rect x="47.0" y="66" width="4.6" height="7" rx="1" fill="#FF3B2F"></rect><rect x="53.6" y="66" width="4.6" height="7" rx="1" fill="#36383D"></rect><rect x="60.2" y="66" width="4.6" height="7" rx="1" fill="#36383D"></rect><rect x="66.8" y="66" width="4.6" height="7" rx="1" fill="#36383D"></rect><rect x="73.4" y="66" width="4.6" height="7" rx="1" fill="#36383D"></rect><rect x="80.0" y="66" width="4.6" height="7" rx="1" fill="#36383D"></rect><rect x="0" y="88" width="25" height="12" fill="#D8262E"></rect><rect x="25" y="88" width="25" height="12" fill="#EFB3B5"></rect><rect x="50" y="88" width="25" height="12" fill="#DEDFE1"></rect><rect x="75" y="88" width="25" height="12" fill="#9FBCD6"></rect></g></svg>
   <div class="ttl"><b id="hdrName">FTO FieldBook</b><small id="hdrSub">Field training · FTEP</small></div>
   <div class="sync"><span class="dot" id="syncDot"></span><span id="syncTx">local</span></div>
 </header>
@@ -733,7 +756,7 @@ function trendRow(r){return `<div class="trend"><span class="mono small muted" s
 function vSetup(){
   const p=P();
   return `
-  <div class="card"><h3>Appearance</h3><div class="themepick">${[['auto','Auto',['#E7E7E1','#1B222A']],['light','Light',['#E7E7E1','#4E5C6A','#D42A31']],['slate','Slate',['#4E5C6A','#3C4753','#39B4F2']],['night','Night',['#1B222A','#232B34','#E8343B']]].map(([k,l,c])=>`<button data-act="setTheme" data-v="${k}" class="${themeMode()===k?'on':''}"><span class="sw">${c.map(x=>`<i style="background:${x}"></i>`).join('')}</span>${l}</button>`).join('')}</div><p class="small muted" style="margin:8px 0 0">Auto uses Light by day and Night when your phone is in dark mode. Slate is the 26K / SP-12 look.</p></div>
+  <div class="card"><h3>Appearance</h3><div class="themepick">${[['k11','Deck',['#1F2023','#2C2E32','#D8262E']],['k11s','Silver',['#D6D7DA','#1F2023','#D8262E']],['auto','Auto',['#D6D7DA','#1F2023']],['slate','Slate',['#4E5C6A','#3C4753','#39B4F2']]].map(([k,l,c])=>`<button data-act="setTheme" data-v="${k}" class="${themeMode()===k?'on':''}"><span class="sw">${c.map(x=>`<i style="background:${x}"></i>`).join('')}</span>${l}</button>`).join('')}</div><p class="small muted" style="margin:8px 0 0">Deck and Silver use the 11K colours. Auto uses Silver by day and Deck when your phone is in dark mode. Slate is the 26K look.</p></div>
   <div class="card"><h3>Trainees</h3><div class="tlist">
   ${p.trainees.length?p.trainees.map(t=>`<button class="tr" data-act="setActive" data-id="${t.id}"><span style="width:18px">${p.active===t.id?'●':'○'}</span><span class="grow"><b>${esc(t.name)}</b><br><span class="small muted">${t.badge?'#'+esc(t.badge)+' · ':''}Level ${esc(t.level)} · ${esc(t.phase)}${t.start?' · started '+esc(usDate(t.start)):''}</span></span><span class="chip" data-act="editTrainee" data-id="${t.id}">Edit</span></button>`).join(''):'<p class="muted small">No trainees yet.</p>'}
   </div><button class="btn pri full" style="margin-top:10px" data-act="editTrainee">Add trainee</button></div>
@@ -759,8 +782,8 @@ function vSetup(){
 }
 
 // ================= theme =================
-function themeMode(){try{const m=localStorage.getItem('fto_theme')||'auto';return m==='dark'?'night':m}catch(e){return 'auto'}}
-function applyTheme(){const m=themeMode();const t=m==='auto'?(matchMedia('(prefers-color-scheme: dark)').matches?'night':'light'):m;document.documentElement.dataset.theme=t;const mc=document.querySelector('meta[name=theme-color]');if(mc)mc.content=t==='light'?'#4E5C6A':t==='slate'?'#2F3943':'#12171D'}
+function themeMode(){try{const m=localStorage.getItem('fto_theme')||'k11';return ({light:'k11s',night:'k11',dark:'k11'})[m]||m}catch(e){return 'k11'}}
+function applyTheme(){const m=themeMode();const t=m==='auto'?(matchMedia('(prefers-color-scheme: dark)').matches?'k11':'k11s'):m;document.documentElement.dataset.theme=t;const mc=document.querySelector('meta[name=theme-color]');if(mc)mc.content=t==='slate'?'#2F3943':t==='k11s'?'#1F2023':'#17181B'}
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themeMode()==='auto')applyTheme()})}catch(e){}
 
 // ================= sheets =================
