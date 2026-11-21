@@ -1,8 +1,86 @@
 name: iOS
+
+# Every push that touches ios/ compiles the app (no signing, no secrets needed).
+# A TestFlight upload runs when the commit message contains [testflight]
+# or when the workflow is started by hand, and only if the App Store Connect secrets exist.
 on:
+  push:
+    branches: [main]
+    paths: ['ios/**', '.github/workflows/ios.yml']
   workflow_dispatch:
+
 jobs:
-  probe:
+  build:
     runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      HAS_KEY: ${{ secrets.ASC_PRIVATE_KEY != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.APPLE_TEAM_ID != '' }}
+      WANT_UPLOAD: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[testflight]') }}
     steps:
-      - run: xcodebuild -version; ls /Applications | grep -i xcode
+      - uses: actions/checkout@v4
+
+      - name: Tools
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Compile for simulator (no signing)
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild -project FieldBook.xcodeproj -scheme FieldBook \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build.log | grep -E "error:|warning: unre|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+
+      - name: Archive and upload to TestFlight
+        if: env.HAS_KEY == 'true' && env.WANT_UPLOAD == 'true'
+        working-directory: ios
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          KEYDIR="$RUNNER_TEMP/keys"; mkdir -p "$KEYDIR"
+          KEYFILE="$KEYDIR/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s\n' "$ASC_PRIVATE_KEY" > "$KEYFILE"
+          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEYFILE" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          BUILD_NO=$(( 100 + ${{ github.run_number }} ))
+          xcodebuild -project FieldBook.xcodeproj -scheme FieldBook -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/FieldBook.xcarchive" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CURRENT_PROJECT_VERSION="$BUILD_NO" \
+            "${AUTH[@]}" archive 2>&1 | tee archive.log | grep -E "error:|ARCHIVE (SUCCEEDED|FAILED)" || true
+          grep -q "ARCHIVE SUCCEEDED" archive.log
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>testFlightInternalTestingOnly</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/FieldBook.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
+            "${AUTH[@]}" 2>&1 | tee export.log | grep -E "error:|Upload succeeded|EXPORT (SUCCEEDED|FAILED)|Uploaded" || true
+          grep -q -E "EXPORT SUCCEEDED|Upload succeeded" export.log
+          echo "Uploaded build $BUILD_NO to App Store Connect"
+          rm -f "$KEYFILE"
+
+      - name: Keep logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: ios/*.log
+          if-no-files-found: ignore
