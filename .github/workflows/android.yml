@@ -45,6 +45,13 @@ jobs:
           gradle :app:testDebugUnitTest 2>&1 | tee test.log | grep -E "FAILED|tests completed|BUILD (SUCCESSFUL|FAILED)|Test.*>" ; test ${PIPESTATUS[0]} -eq 0
           grep -ho '<testsuite [^>]*' app/build/test-results/testDebugUnitTest/*.xml | grep -o 'name="[^"]*"\|tests="[0-9]*"\|failures="[0-9]*"\|errors="[0-9]*"' | paste -sd' '
 
+      - name: Check release build (no signing key yet)
+        if: env.ANDROID_KEY_PASSWORD == ''
+        working-directory: android
+        run: |
+          gradle :app:assembleRelease 2>&1 | tee release.log | grep -E "^e: |error:|Error|FAILED|BUILD (SUCCESSFUL|FAILED)" ; test ${PIPESTATUS[0]} -eq 0
+          ls -la app/build/outputs/apk/release/
+
       # One-time: create the signing key, encrypted with the passphrase in the ANDROID_KEY_PASSWORD secret,
       # and commit only the encrypted file. Every later build reuses it, so installed copies can update.
       - name: Signing key
