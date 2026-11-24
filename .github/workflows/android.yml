@@ -22,11 +22,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Secrets this build can see (names only)
-        env:
-          ALL: ${{ toJSON(secrets) }}
-        run: echo "$ALL" | jq -r 'keys[] | "  - " + .'
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
