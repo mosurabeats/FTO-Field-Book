@@ -36,11 +36,13 @@ jobs:
 
       - name: Compile (debug)
         working-directory: android
-        run: gradle :app:assembleDebug --stacktrace 2>&1 | tee build.log | grep -E "^e: |error:|FAILED|BUILD (SUCCESSFUL|FAILED)" ; test ${PIPESTATUS[0]} -eq 0
+        run: |
+          gradle :app:assembleDebug --stacktrace 2>&1 | tee build.log | grep -E "^e: |error:|FAILED|BUILD (SUCCESSFUL|FAILED)" ; test ${PIPESTATUS[0]} -eq 0
 
       - name: Tests (form filling, backups)
         working-directory: android
-        run: gradle :app:testDebugUnitTest 2>&1 | tee test.log | grep -E "FAILED|tests completed|BUILD (SUCCESSFUL|FAILED)|Test.*>" ; test ${PIPESTATUS[0]} -eq 0
+        run: |
+          gradle :app:testDebugUnitTest 2>&1 | tee test.log | grep -E "FAILED|tests completed|BUILD (SUCCESSFUL|FAILED)|Test.*>" ; test ${PIPESTATUS[0]} -eq 0
 
       # One-time: create the signing key, encrypted with the passphrase in the ANDROID_KEY_PASSWORD secret,
       # and commit only the encrypted file. Every later build reuses it, so installed copies can update.
